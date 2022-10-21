@@ -127,7 +127,7 @@ ui <- navbarPage("House Price in Melbourne", id="nav",
                                             
                                             
                               ),# absolutePanel ends
-                              conditionalPanel( condition = "input.search",
+                              conditionalPanel( condition = "input.search",#only shows up when search clicked
                                                 absolutePanel(id = "controls", class = "panel panel-default", fixed = TRUE,
                                                               draggable = FALSE,  top = 60, left = "auto", right =50, bottom = "auto",
                                                               width = 600, height = 700,
@@ -220,18 +220,18 @@ server <- function(input, output, session) {
     data <- data[order(data$Sale_Year),]
     
     fig <- plot_ly(
-      data[data$Type == 'House/Townhouse',], 
-      x = ~Sale_Year, y = ~obj, 
-      type = 'scatter', 
-      mode = 'lines', 
+      data[data$Type == 'House/Townhouse',],
+      x = ~Sale_Year, y = ~obj,
+      type = 'scatter',
+      mode = 'lines',
       showlegend = TRUE,
       name="House/Townhouse Median Price"
     )
     
     fig <- fig %>% add_trace(
-      data = data[data$Type == 'Residential Apartment',], 
-      x = ~Sale_Year, y = ~obj, type = 'scatter', 
-      mode = 'lines', 
+      data = data[data$Type == 'Residential Apartment',],
+      x = ~Sale_Year, y = ~obj, type = 'scatter',
+      mode = 'lines',
       showlegend = TRUE,
       name="Residential Apartment Median Price")
     
@@ -243,13 +243,14 @@ server <- function(input, output, session) {
     v$small_area <- click$id
   })
   
-  
+  #resrt the time to system time
   observeEvent(input$reset_time, {
     updateTimeInput(session, "time_input", value = Sys.time())})
   
-  
+  #when click search  or alternative, this search function works
   searchRoute <- eventReactive({input$search|input$alternatives}, {
     time=input$time_input
+    #set default value from unimelb to cbd
     if(input$origin == ""){
       origin <- "university of melbourne"
     }
@@ -289,18 +290,19 @@ server <- function(input, output, session) {
     
     mp_get_segments(doc)
   })
-  
+  #plot a map without route
   output$search_route <- renderLeaflet({
     r <- searchRoute()
     leaflet(r) %>%
       addProviderTiles("CartoDB.DarkMatter")%>%
       setView(lat=-37.812175979147106,lng=144.96245084166554,zoom=10)
   })
-  
+  #get routes when click search
   observeEvent(input$search,{
     
     r <- searchRoute()
     v$instructions <- ""
+    #index of 1st choice and alternative
     idx1=0
     idx2=0
     for(i in r$alternative_id){
@@ -312,43 +314,43 @@ server <- function(input, output, session) {
     for(i in r[1:idx1,1:13]$duration_s){
       t=t-i
     }
-    
+    #calculate Recommended departure time
     output$text=renderText(paste("Recommended departure time:",format(strptime(format(t, "%X"),"%H:%M:%S"),"%H:%M")))
-    
+    #output route detail
     output$detail<-renderDataTable({
       dt <- DT::datatable(
         get_table(r[1:idx1,1:13]),
-        rownames = FALSE, 
+        rownames = FALSE,
         options = list(autoWidth = TRUE,searching = FALSE,paging = FALSE)
       )
-      
+      #shows color when click route
       if(!is.na(v$instructions)){
         dt <- dt %>%
           formatStyle(
-            'instructions', target = 'row', 
-            backgroundColor = styleEqual(c(v$instructions), c("blue"))
+            'instructions', target = 'row',
+            backgroundColor = styleEqual(c(v$instructions), c("#FAF5C2"))
           )
       }
       
       dt
     })
-    
+    #color of each segment of route
     pal <- colorNumeric(c( "#CCFBFE","#E9706C"), 1:length(unique(r$travel_mode)))
     time=format(strptime(format(input$time_input, "%X"),"%H:%M:%S"),'%H')
     map <- leaflet(r[1:idx1,1:13])
-    
+    #if it's day or night
     if (as.integer(time) >= 7 & as.integer(time) < 17 ){
       map <- map %>% addProviderTiles("CartoDB.Positron")
     }
     else{
       map <- map %>% addProviderTiles("CartoDB.DarkMatter")
     }
-    
+    #plot route
     output$search_route <- renderLeaflet({
-      map %>% 
+      map %>%
         addPolylines(
-          opacity = 1, 
-          weight = 7, 
+          opacity = 1,
+          weight = 7,
           layerId = ~instructions,
           color = ~pal(c(1:length(unique(travel_mode)))), popup = ~paste(instructions,duration_text))%>%
         addCircleMarkers(color="#A7A157",lng = unlist(st_cast(r$geometry[idx1], "POINT"))[length(unlist(st_cast(r$geometry[idx1], "POINT")))-1],
@@ -360,7 +362,7 @@ server <- function(input, output, session) {
                          popup ="Start Point")
     })
   })
-  
+  #change to alternative detail if alternatives clicked
   observeEvent(input$alternatives,{
     r <- searchRoute()
     v$instructions <- ""
@@ -381,15 +383,15 @@ server <- function(input, output, session) {
     output$detail<-renderDataTable({
       dt <- DT::datatable(
         get_table(r[(1+idx1):(idx1+idx2),1:13]),
-        rownames = FALSE, 
+        rownames = FALSE,
         options = list(autoWidth = TRUE,searching = FALSE,paging = FALSE)
       )
       
       if(!is.na(v$instructions)){
         dt <- dt %>%
           formatStyle(
-            'instructions', target = 'row', 
-            backgroundColor = styleEqual(c(v$instructions), c("blue"))
+            'instructions', target = 'row',
+            backgroundColor = styleEqual(c(v$instructions),c("#FAF5C2"))
           )
       }
       
@@ -412,8 +414,8 @@ server <- function(input, output, session) {
     output$search_route <- renderLeaflet({
       map %>%
         addPolylines(
-          opacity = 1, 
-          weight = 7, 
+          opacity = 1,
+          weight = 7,
           layerId = ~instructions,
           color = ~pal(c(1:length(unique(travel_mode)))), popup = ~paste(instructions,duration_text))%>%
         addCircleMarkers(color="#A7A157",lng =~unlist(st_cast(geometry[idx2], "POINT"))[length(unlist(st_cast(geometry[idx2], "POINT")))-1],
@@ -431,7 +433,7 @@ server <- function(input, output, session) {
     click <- input$search_route_shape_click
     v$instructions <- click$id
   })
-  
+  #process needed information on the table from google api result
   get_table<-function(data){
     df = data.frame(matrix(nrow = length(data$alternative_id), ncol = 4))
     colnames(df)=c("travel_mode","instructions","duration_time","distance")
